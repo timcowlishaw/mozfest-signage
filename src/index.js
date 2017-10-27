@@ -1,16 +1,8 @@
 const Snap = require(`imports-loader?this=>window,fix=>module.exports=0!snapsvg/dist/snap.svg.js`);
 const svg = Snap(1024, 768);
+const offset = 20 * 60 * 60 * 1000 - 5 * 60 * 1000;
 
-
-const data = {
-    "gallery": {
-        "08:00:00": "Testing gallery slot"
-    },
-    "shed1": {
-        "08:00:00": "Testing shed slot"
-    }
-}
-
+const data = require("../data/sessions.json"); 
 const makeArrow = function(svg, width, height, headLength, shaftHeight) {
     const shaftTop = 0+ (height-shaftHeight*height)/2;
     const shaftBottom = height - (height-shaftHeight*height)/2; 
@@ -27,17 +19,30 @@ const makeArrow = function(svg, width, height, headLength, shaftHeight) {
     return arrow;   
 };
 
-const makeSign = function(svg, width, height, headLength, shaftHeight, label, color, padding) {
-    const arrow = makeArrow(svg, width, height, headLength, shaftHeight);
-    arrow.attr({fill: color});
-    const text = svg.text(padding, height/2, label);
-    text.attr({fontFamily: "Helvetica Neue", fontWeight: "bold"});
-    text.animate({x: width}, 1000);
-    const group =  svg.group(arrow, text);
-    const mask = makeArrow(svg, width, height, headLength, shaftHeight);
-    mask.attr({fill: "#ffffff", display: "none"});
-    group.attr({mask: mask});
-    return svg.group(group, mask);
+
+
+const makeSign = function(schedule, svg) {
+    const arrow = makeArrow(svg, schedule.width, schedule.height, schedule.headLength, schedule.shaftHeight);
+    arrow.attr({fill: schedule.color});
+    console.log(schedule.color);
+    const titleText = svg.text(10,10 + schedule.height/3, schedule["name"]);
+    titleText.attr({fontFamily: "Helvetica Neue", fontWeight: "bold", fontSize: schedule.height/3});
+    const sessionText = svg.text(10, 35 + schedule.height/3, "");
+    sessionText.attr({fontFamily: "Helvetica Neue", fontWeight: "bold", fontSize: schedule.height/6.5});
+    const updateText = () => {
+        const now = (new Date(Date.now() + offset)).toISOString();
+        const session = schedule["sessions"].find((item) => {
+            return item.startTime <= now && item.endTime >= now;
+        });
+        if(session) {
+            sessionText.attr({text: session.name});
+        }
+    };
+    window.setInterval(updateText, 60*1000);
+    updateText();
+    const group = svg.group(arrow, titleText, sessionText);
+    transform(group, (t) => { t.translate(schedule.x, schedule.y).rotate(schedule.rotation); });
+    return group;
 }
 
 
@@ -49,8 +54,9 @@ const transform = function(element, callback) {
     element.transform(mat.toTransformString());
 }
 
-const arrow = makeSign(svg, 200, 150, 0.4, 0.5, data["gallery"]["08:00:00"], "#bada55", 5);
-transform(arrow, (t) => { t.translate(400, 100).rotate(50).scale(2.0); });
+const arrows = {};
 
-const arrow2 = makeSign(svg, 200, 150, 0.5, 0.7, data["shed1"]["08:00:00"], "#55daba", 5);
-transform(arrow2, (t) => { t.translate(450, 100).rotate(120); });
+for (var space in data) {
+    makeSign(data[space], svg);
+}
+
